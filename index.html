@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player Picker • Minecraft Mini-Game Coding Camp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #141327;
+    --night2: #1e1c38;
+    --panel: #c6c6c6;
+    --panel-dark: #8b8b8b;
+    --slot: #7b7b7b;
+    --ink: #1c1c1c;
+    --cream: #f4efe2;
+    --grass: #6cbf43;
+    --grass-dark: #4c8f2c;
+    --dirt: #8b5a2b;
+    --dirt-dark: #6e4522;
+    --gold: #fcdc5f;
+    --diamond: #4aedd9;
+    --redstone: #e0483a;
+    --lapis: #3b5dc9;
+    --pix: "Press Start 2P", monospace;
+    --ui: "VT323", "Courier New", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse at 50% -20%, #2c2954 0%, transparent 55%),
+      linear-gradient(var(--night) 0%, var(--night2) 100%);
+    color: var(--cream);
+    font-family: var(--ui);
+    font-size: 22px;
+    overflow-x: hidden;
+  }
+
+  /* Blocky terrain strip along the bottom of the page */
+  .terrain {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    height: 44px;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(90deg,
+        var(--grass) 0 24px, var(--grass-dark) 24px 48px) top / 100% 12px no-repeat,
+      repeating-linear-gradient(90deg,
+        var(--dirt) 0 24px, var(--dirt-dark) 24px 48px) bottom / 100% 32px no-repeat;
+    opacity: .85;
+  }
+
+  /* Floating square particles, like embers or fireflies */
+  .particle {
+    position: fixed;
+    width: 7px; height: 7px;
+    z-index: 0;
+    opacity: .45;
+    animation: floatUp linear infinite;
+    pointer-events: none;
+  }
+  @keyframes floatUp {
+    from { transform: translateY(105vh) rotate(0deg); }
+    to   { transform: translateY(-8vh) rotate(360deg); }
+  }
+
+  header {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 26px 16px 8px;
+  }
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  #titleIcon {
+    width: 44px; height: 44px;
+    image-rendering: pixelated;
+    animation: bob 2.4s ease-in-out infinite;
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  h1 {
+    font-family: var(--pix);
+    font-size: clamp(20px, 4.4vw, 34px);
+    margin: 0;
+    color: var(--gold);
+    text-shadow: 3px 3px 0 #3d2c00, 6px 6px 0 rgba(0,0,0,.35);
+    letter-spacing: 2px;
+  }
+  .subtitle {
+    margin: 10px 0 0;
+    font-size: 24px;
+    color: #b9b4d6;
+    letter-spacing: 1px;
+  }
+
+  main {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 26px;
+    max-width: 1060px;
+    margin: 18px auto 70px;
+    padding: 0 18px;
+    align-items: start;
+  }
+
+  /* ============ Minecraft GUI panel (inventory look) ============ */
+  .mc-panel {
+    background: var(--panel);
+    border: 3px solid #1c1c1c;
+    box-shadow:
+      inset 4px 4px 0 rgba(255,255,255,.85),
+      inset -4px -4px 0 #555,
+      0 8px 0 rgba(0,0,0,.35);
+    padding: 16px;
+    color: var(--ink);
+  }
+  .mc-panel h2 {
+    font-family: var(--pix);
+    font-size: 13px;
+    margin: 2px 0 12px;
+    color: #3f3f3f;
+  }
+
+  textarea {
+    width: 100%;
+    height: 240px;
+    resize: vertical;
+    background: var(--slot);
+    color: #fff;
+    border: 3px solid #1c1c1c;
+    box-shadow: inset 3px 3px 0 #4c4c4c, inset -3px -3px 0 #a9a9a9;
+    font-family: var(--ui);
+    font-size: 24px;
+    line-height: 1.25;
+    padding: 10px 12px;
+    outline: none;
+  }
+  textarea::placeholder { color: #d5d5d5; }
+  textarea:focus-visible { outline: 3px solid var(--gold); }
+
+  .count-line {
+    margin: 8px 0 4px;
+    font-size: 22px;
+    color: #2e2e2e;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .toggle-row input {
+    position: absolute;
+    opacity: 0;
+    width: 1px; height: 1px;
+  }
+  .toggle-box {
+    flex: 0 0 auto;
+    width: 26px; height: 26px;
+    background: var(--slot);
+    border: 3px solid #1c1c1c;
+    box-shadow: inset 2px 2px 0 #4c4c4c, inset -2px -2px 0 #a9a9a9;
+    display: grid;
+    place-items: center;
+    font-size: 20px;
+    color: #baff9e;
+    font-weight: bold;
+  }
+  .toggle-row input:checked + .toggle-box { background: var(--grass-dark); }
+  .toggle-row input:focus-visible + .toggle-box { outline: 3px solid var(--gold); }
+  .toggle-label { font-size: 22px; line-height: 1.1; }
+
+  .picked-wrap { margin-top: 14px; }
+  .picked-title {
+    font-family: var(--pix);
+    font-size: 11px;
+    color: #3f3f3f;
+    margin-bottom: 8px;
+  }
+  .picked-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 10px;
+  }
+  .chip {
+    font-family: var(--ui);
+    font-size: 20px;
+    background: var(--slot);
+    color: #eee;
+    border: 2px solid #1c1c1c;
+    box-shadow: inset 2px 2px 0 #4c4c4c;
+    padding: 2px 8px;
+    cursor: pointer;
+    text-decoration: line-through;
+  }
+  .chip:hover { background: var(--grass-dark); text-decoration: none; }
+  .chip:focus-visible { outline: 3px solid var(--gold); }
+
+  /* ============ Minecraft-style buttons ============ */
+  .mc-btn {
+    font-family: var(--pix);
+    font-size: 12px;
+    color: #fff;
+    text-shadow: 2px 2px 0 rgba(0,0,0,.5);
+    background: #6f6f6f;
+    border: 3px solid #1c1c1c;
+    box-shadow:
+      inset 3px 3px 0 rgba(255,255,255,.35),
+      inset -3px -4px 0 rgba(0,0,0,.35);
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: transform .05s;
+  }
+  .mc-btn:hover { background: #7d8cc4; }
+  .mc-btn:active { transform: translateY(2px); }
+  .mc-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .mc-btn:disabled {
+    background: #4a4a4a;
+    color: #9a9a9a;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .mc-btn.small { font-size: 10px; padding: 9px 12px; margin-top: 12px; }
+  .mc-btn.green { background: var(--grass-dark); }
+  .mc-btn.green:hover { background: var(--grass); }
+
+  /* ============ Wheel column ============ */
+  .wheel-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+  .wheel-wrap {
+    position: relative;
+    width: min(560px, 92vw);
+  }
+  #wheel {
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 10px 0 rgba(0,0,0,.35));
+  }
+  .pointer {
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    z-index: 2;
+  }
+  .pointer::before {
+    content: "";
+    position: absolute;
+    left: -26px; top: 0;
+    border-left: 26px solid transparent;
+    border-right: 26px solid transparent;
+    border-top: 40px solid #1c1c1c;
+  }
+  .pointer::after {
+    content: "";
+    position: absolute;
+    left: -19px; top: 3px;
+    border-left: 19px solid transparent;
+    border-right: 19px solid transparent;
+    border-top: 30px solid var(--gold);
+  }
+
+  /* Hotbar-style number selector */
+  .hotbar-label {
+    font-family: var(--pix);
+    font-size: 12px;
+    color: #cfc9ee;
+    text-shadow: 2px 2px 0 rgba(0,0,0,.6);
+  }
+  .hotbar {
+    display: flex;
+    gap: 6px;
+    background: rgba(0,0,0,.45);
+    border: 3px solid #1c1c1c;
+    padding: 6px;
+  }
+  .slot {
+    width: 54px; height: 54px;
+    background: #8b8b8b;
+    border: 3px solid #373737;
+    box-shadow: inset 2px 2px 0 #5f5f5f, inset -2px -2px 0 #b5b5b5;
+    font-family: var(--pix);
+    font-size: 16px;
+    color: #fff;
+    text-shadow: 2px 2px 0 rgba(0,0,0,.5);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    padding: 0;
+  }
+  .slot:hover { background: #a0a0a0; }
+  .slot:focus-visible { outline: 3px solid var(--gold); }
+  .slot.selected {
+    background: var(--grass-dark);
+    border-color: #fff;
+    box-shadow: inset 2px 2px 0 rgba(255,255,255,.4), 0 0 0 2px #1c1c1c;
+  }
+
+  .spin-btn {
+    font-size: 20px;
+    padding: 18px 44px;
+    letter-spacing: 2px;
+  }
+
+  .sound-btn { margin-top: 2px; }
+
+  /* ============ Toast (achievement-style message) ============ */
+  #toast {
+    position: fixed;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-140%);
+    z-index: 60;
+    background: #212121;
+    border: 3px solid var(--gold);
+    color: var(--cream);
+    font-family: var(--ui);
+    font-size: 24px;
+    padding: 10px 20px;
+    box-shadow: 0 6px 0 rgba(0,0,0,.4);
+    transition: transform .3s ease;
+    max-width: 92vw;
+    text-align: center;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ============ Results overlay ============ */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 8, 24, .8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 20px;
+  }
+  #overlay.show { display: flex; }
+  .results-panel {
+    width: min(560px, 94vw);
+    max-height: 90vh;
+    overflow-y: auto;
+    text-align: center;
+    animation: panelPop .25s ease-out;
+  }
+  @keyframes panelPop {
+    from { transform: scale(.85); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+  .results-panel h2 { font-size: 15px; color: #2e5a1c; }
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 6px 0 16px;
+  }
+  .card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--slot);
+    border: 3px solid #1c1c1c;
+    box-shadow: inset 3px 3px 0 #4c4c4c, inset -3px -3px 0 #a9a9a9;
+    padding: 10px 14px;
+    transform: scale(0);
+    animation: cardPop .35s cubic-bezier(.2, 1.6, .4, 1) forwards;
+  }
+  @keyframes cardPop { to { transform: scale(1); } }
+  .card canvas {
+    width: 40px; height: 40px;
+    image-rendering: pixelated;
+    flex: 0 0 auto;
+  }
+  .card .pname {
+    color: #fff;
+    font-size: 30px;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+  .results-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* Confetti squares */
+  .confetti {
+    position: fixed;
+    top: -20px;
+    z-index: 55;
+    pointer-events: none;
+    animation: confFall linear forwards;
+  }
+  @keyframes confFall {
+    to { transform: translateY(110vh) rotate(720deg); }
+  }
+
+  footer {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    font-size: 20px;
+    color: #8f89b8;
+    padding: 0 16px 60px;
+  }
+  footer a { color: #b9b4d6; }
+
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 780px) {
+    main { grid-template-columns: 1fr; }
+    .wheel-col { order: -1; }
+    textarea { height: 170px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .particle, #titleIcon { animation: none; }
+    .card { animation-duration: .01s; }
+  }
+</style>
+</head>
+<body>
+
+<div class="terrain" aria-hidden="true"></div>
+
+<header>
+  <div class="title-row">
+    <canvas id="titleIcon" width="8" height="8" aria-hidden="true"></canvas>
+    <h1>PLAYER PICKER</h1>
+    <canvas id="titleIcon2" width="8" height="8" aria-hidden="true"></canvas>
+  </div>
+  <p class="subtitle">Who joins the next mini-game? Spin to find out!</p>
+</header>
+
+<main>
+  <section class="mc-panel" aria-label="Player roster">
+    <h2>PLAYER ROSTER</h2>
+    <textarea id="names" placeholder="One player name per line..." spellcheck="false" aria-label="Player names, one per line"></textarea>
+    <p class="count-line" id="countLine">0 players on the wheel</p>
+
+    <label class="toggle-row">
+      <input type="checkbox" id="removeToggle">
+      <span class="toggle-box" id="toggleBox" aria-hidden="true"></span>
+      <span class="toggle-label">Remove picked players from the wheel</span>
+    </label>
+
+    <label class="toggle-row">
+      <input type="checkbox" id="soundToggle" checked>
+      <span class="toggle-box" id="soundBox" aria-hidden="true">&#10003;</span>
+      <span class="toggle-label">Sound effects</span>
+    </label>
+
+    <div class="picked-wrap" id="pickedWrap" hidden>
+      <div class="picked-title">ALREADY PICKED (click to restore)</div>
+      <div class="picked-chips" id="pickedChips"></div>
+      <button class="mc-btn small" id="restoreBtn">RESTORE ALL PLAYERS</button>
+    </div>
+  </section>
+
+  <section class="wheel-col" aria-label="Spinner wheel">
+    <div class="wheel-wrap">
+      <div class="pointer" aria-hidden="true"></div>
+      <canvas id="wheel" width="640" height="640" role="img" aria-label="Spinning wheel of player names"></canvas>
+    </div>
+
+    <div class="hotbar-label" id="hotbarLabel">PLAYERS TO PICK: 1</div>
+    <div class="hotbar" role="radiogroup" aria-labelledby="hotbarLabel">
+      <button class="slot selected" data-n="1" role="radio" aria-checked="true">1</button>
+      <button class="slot" data-n="2" role="radio" aria-checked="false">2</button>
+      <button class="slot" data-n="3" role="radio" aria-checked="false">3</button>
+      <button class="slot" data-n="4" role="radio" aria-checked="false">4</button>
+      <button class="slot" data-n="5" role="radio" aria-checked="false">5</button>
+      <button class="slot" data-n="6" role="radio" aria-checked="false">6</button>
+    </div>
+
+    <button class="mc-btn green spin-btn" id="spinBtn">SPIN!</button>
+  </section>
+</main>
+
+<div id="toast" role="status"></div>
+<div class="sr-only" aria-live="polite" id="announcer"></div>
+
+<div id="overlay">
+  <div class="mc-panel results-panel">
+    <h2 id="resultsTitle">PLAYERS SELECTED!</h2>
+    <div class="cards" id="cards"></div>
+    <div class="results-buttons">
+      <button class="mc-btn green" id="againBtn">SPIN AGAIN</button>
+      <button class="mc-btn" id="closeBtn">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Vibe coded by Wes Fryer with Claude for the
+  <a href="https://lessons.wesfryer.com/courses/summer-camps/summer-2026/minecraft-mini-game-coding" target="_blank" rel="noopener">Minecraft Mini-Game Coding Camp</a>
+  &bull; Press Space to spin
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============================================================
+     Pixel art icons (8x8 grids). '.' means transparent.
+     ============================================================ */
+  var PIX = {
+    creeper: { map: { g: "#4da33c", B: "#101410" }, rows: [
+      "gggggggg",
+      "gBBggBBg",
+      "gBBggBBg",
+      "gggBBggg",
+      "ggBBBBgg",
+      "ggBBBBgg",
+      "ggBggBgg",
+      "ggBggBgg"
+    ]},
+    tnt: { map: { R: "#db441a", r: "#a8330f", W: "#e8e0d0", B: "#2b241c" }, rows: [
+      "rRRRRRRr",
+      "RRRRRRRR",
+      "RrRRRRrR",
+      "WWWWWWWW",
+      "WBWBWBWW",
+      "RrRRRRrR",
+      "RRRRRRRR",
+      "rRRRRRRr"
+    ]},
+    diamond: { map: { C: "#4aedd9", c: "#2bbfae", W: "#d8fffa" }, rows: [
+      "........",
+      "..CCCC..",
+      ".CWCCCc.",
+      "CCCCCCCc",
+      ".cCCCCc.",
+      "..cCCc..",
+      "...cc...",
+      "........"
+    ]},
+    sword: { map: { S: "#cfd8dc", s: "#8fa2aa", G: "#c98f3a", H: "#6d4c41" }, rows: [
+      "......SS",
+      ".....SSs",
+      "....SSs.",
+      "...SSs..",
+      ".G.Ss...",
+      "..GG....",
+      ".HGG....",
+      "HH......"
+    ]},
+    heart: { map: { R: "#e0483a", W: "#ff9d94" }, rows: [
+      "........",
+      ".RR..RR.",
+      "RWRRRRRR",
+      "RRRRRRRR",
+      ".RRRRRR.",
+      "..RRRR..",
+      "...RR...",
+      "........"
+    ]},
+    xp: { map: { E: "#7dd63f", e: "#4f9e22", L: "#c8ff8a" }, rows: [
+      "........",
+      "..EEEE..",
+      ".ELLEEe.",
+      ".ELEEEe.",
+      ".EEEEEe.",
+      ".eEEEee.",
+      "..eeee..",
+      "........"
+    ]},
+    potion: { map: { K: "#9e9e9e", G: "#cfe8ef", P: "#e05ac8", p: "#a83a96" }, rows: [
+      "...KK...",
+      "...KK...",
+      "..GGGG..",
+      "..GPPG..",
+      ".GPPPPG.",
+      ".GPpPPG.",
+      ".GPPpPG.",
+      "..GGGG.."
+    ]},
+    grass: { map: { G: "#6cbf43", g: "#559a2f", D: "#8b5a2b", d: "#6e4522" }, rows: [
+      "GGGGGGGG",
+      "GgGGgGGg",
+      "gDgDDgDg",
+      "DDDDDDDD",
+      "DdDDDdDD",
+      "DDDdDDDD",
+      "DdDDDDdD",
+      "DDDDDDDD"
+    ]}
+  };
+
+  function drawPix(ctx, icon, x, y, size) {
+    var s = size / 8;
+    for (var ry = 0; ry < 8; ry++) {
+      var row = icon.rows[ry];
+      for (var cx = 0; cx < 8; cx++) {
+        var color = icon.map[row[cx]];
+        if (color) {
+          ctx.fillStyle = color;
+          ctx.fillRect(x + cx * s, y + ry * s, s + 0.4, s + 0.4);
+        }
+      }
+    }
+  }
+
+  /* Wedge color and icon pairs, chosen so icons pop against fills */
+  var WEDGES = [
+    { fill: "#6cbf43", icon: PIX.tnt },
+    { fill: "#4aedd9", icon: PIX.creeper },
+    { fill: "#e0483a", icon: PIX.diamond },
+    { fill: "#fcdc5f", icon: PIX.heart },
+    { fill: "#3b5dc9", icon: PIX.xp },
+    { fill: "#b8865f", icon: PIX.sword },
+    { fill: "#9a9a9a", icon: PIX.potion },
+    { fill: "#9a5cc6", icon: PIX.grass }
+  ];
+
+  function isLight(hex) {
+    var r = parseInt(hex.slice(1, 3), 16),
+        g = parseInt(hex.slice(3, 5), 16),
+        b = parseInt(hex.slice(5, 7), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) > 150;
+  }
+
+  /* ============================================================
+     Elements and state
+     ============================================================ */
+  var canvas = document.getElementById("wheel");
+  var ctx = canvas.getContext("2d");
+  var namesBox = document.getElementById("names");
+  var countLine = document.getElementById("countLine");
+  var removeToggle = document.getElementById("removeToggle");
+  var soundToggle = document.getElementById("soundToggle");
+  var toggleBox = document.getElementById("toggleBox");
+  var pickedWrap = document.getElementById("pickedWrap");
+  var pickedChips = document.getElementById("pickedChips");
+  var restoreBtn = document.getElementById("restoreBtn");
+  var spinBtn = document.getElementById("spinBtn");
+  var hotbarLabel = document.getElementById("hotbarLabel");
+  var slots = Array.prototype.slice.call(document.querySelectorAll(".slot"));
+  var overlay = document.getElementById("overlay");
+  var cardsBox = document.getElementById("cards");
+  var againBtn = document.getElementById("againBtn");
+  var closeBtn = document.getElementById("closeBtn");
+  var toast = document.getElementById("toast");
+  var announcer = document.getElementById("announcer");
+
+  var TWO_PI = Math.PI * 2;
+  var CENTER = 320, RADIUS = 282;
+  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var entries = [];          // [{id, name}]
+  var picked = {};           // id -> true
+  var rotation = 0;          // current wheel rotation in radians
+  var spinning = false;
+  var pickCount = 1;
+  var toastTimer = null;
+
+  /* ============================================================
+     Saved settings (works on GitHub Pages; safely skipped where
+     browser storage is unavailable)
+     ============================================================ */
+  function saveState() {
+    try {
+      localStorage.setItem("spawnPickerState", JSON.stringify({
+        roster: namesBox.value,
+        pickCount: pickCount,
+        removeMode: removeToggle.checked,
+        soundOn: soundToggle.checked
+      }));
+    } catch (e) { /* storage unavailable, no problem */ }
+  }
+  function loadState() {
+    try {
+      var raw = localStorage.getItem("spawnPickerState");
+      if (!raw) return false;
+      var s = JSON.parse(raw);
+      if (typeof s.roster === "string") namesBox.value = s.roster;
+      if (s.pickCount >= 1 && s.pickCount <= 6) pickCount = s.pickCount;
+      removeToggle.checked = !!s.removeMode;
+      soundToggle.checked = s.soundOn !== false;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /* ============================================================
+     Roster handling
+     ============================================================ */
+  function parseRoster() {
+    var lines = namesBox.value.split("\n");
+    var seen = {};
+    entries = [];
+    for (var i = 0; i < lines.length; i++) {
+      var name = lines[i].trim();
+      if (!name) continue;
+      var n = (seen[name] || 0) + 1;
+      seen[name] = n;
+      entries.push({ id: name + "#" + n, name: name });
+    }
+    // Drop picked ids that no longer exist in the roster
+    var valid = {};
+    entries.forEach(function (e) { valid[e.id] = true; });
+    Object.keys(picked).forEach(function (id) {
+      if (!valid[id]) delete picked[id];
+    });
+  }
+
+  function wheelEntries() {
+    if (!removeToggle.checked) return entries.slice();
+    return entries.filter(function (e) { return !picked[e.id]; });
+  }
+
+  function updateSidebar() {
+    var pool = wheelEntries();
+    countLine.textContent = pool.length + (pool.length === 1 ? " player" : " players") + " on the wheel";
+    toggleBox.innerHTML = removeToggle.checked ? "&#10003;" : "";
+    document.getElementById("soundBox").innerHTML = soundToggle.checked ? "&#10003;" : "";
+
+    var pickedIds = Object.keys(picked);
+    pickedWrap.hidden = pickedIds.length === 0;
+    pickedChips.innerHTML = "";
+    entries.forEach(function (e) {
+      if (!picked[e.id]) return;
+      var chip = document.createElement("button");
+      chip.className = "chip";
+      chip.type = "button";
+      chip.textContent = e.name;
+      chip.title = "Restore " + e.name + " to the wheel";
+      chip.addEventListener("click", function () {
+        delete picked[e.id];
+        refresh();
+      });
+      pickedChips.appendChild(chip);
+    });
+  }
+
+  /* ============================================================
+     Wheel drawing
+     ============================================================ */
+  function nameFontSize(count) {
+    if (count <= 8) return 24;
+    if (count <= 12) return 21;
+    if (count <= 18) return 18;
+    if (count <= 26) return 15;
+    return 12;
+  }
+
+  function truncate(name, maxWidth) {
+    if (ctx.measureText(name).width <= maxWidth) return name;
+    var out = name;
+    while (out.length > 1 && ctx.measureText(out + "\u2026").width > maxWidth) {
+      out = out.slice(0, -1);
+    }
+    return out + "\u2026";
+  }
+
+  function drawWheel(highlightIndex) {
+    var pool = wheelEntries();
+    ctx.clearRect(0, 0, 640, 640);
+    ctx.save();
+    ctx.translate(CENTER, CENTER);
+
+    if (pool.length === 0) {
+      ctx.fillStyle = "#3a3856";
+      ctx.beginPath();
+      ctx.arc(0, 0, RADIUS, 0, TWO_PI);
+      ctx.fill();
+      ctx.fillStyle = "#cfc9ee";
+      ctx.font = "26px VT323, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("Add player names to build the wheel", 0, 6);
+    } else {
+      var wa = TWO_PI / pool.length;
+      var fontSize = nameFontSize(pool.length);
+      var iconSize = pool.length <= 14 ? 30 : (pool.length <= 22 ? 22 : 0);
+
+      for (var i = 0; i < pool.length; i++) {
+        var wedge = WEDGES[i % WEDGES.length];
+        // Avoid identical colors touching at the seam
+        if (i === pool.length - 1 && pool.length % WEDGES.length === 1 && pool.length > 1) {
+          wedge = WEDGES[3];
+        }
+        var a0 = rotation + i * wa;
+        var a1 = a0 + wa;
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, RADIUS, a0, a1);
+        ctx.closePath();
+        ctx.fillStyle = wedge.fill;
+        if (highlightIndex === i) {
+          ctx.fillStyle = "#ffffff";
+        }
+        ctx.fill();
+        if (highlightIndex === i) {
+          ctx.save();
+          ctx.globalAlpha = 0.55;
+          ctx.fillStyle = wedge.fill;
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.strokeStyle = "rgba(0,0,0,.4)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        var mid = a0 + wa / 2;
+        var flip = Math.cos(mid) < 0;
+
+        // Icon near the rim, one save/restore per wedge
+        if (iconSize > 0) {
+          ctx.save();
+          ctx.rotate(mid);
+          if (flip) ctx.rotate(Math.PI);
+          var ix = flip ? -(RADIUS - 14) : (RADIUS - 14 - iconSize);
+          drawPix(ctx, wedge.icon, ix, -iconSize / 2, iconSize);
+          ctx.restore();
+        }
+
+        // Name text along the radius
+        ctx.save();
+        ctx.rotate(mid);
+        if (flip) ctx.rotate(Math.PI);
+        ctx.font = "700 " + fontSize + "px 'Trebuchet MS', Verdana, sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = isLight(wedge.fill) ? "#1c1c1c" : "#ffffff";
+        var textEdge = RADIUS - 22 - iconSize;
+        var maxWidth = textEdge - 70;
+        var label = truncate(pool[i].name, maxWidth);
+        if (flip) {
+          ctx.textAlign = "left";
+          ctx.fillText(label, -textEdge, 0);
+        } else {
+          ctx.textAlign = "right";
+          ctx.fillText(label, textEdge, 0);
+        }
+        ctx.restore();
+      }
+    }
+
+    // Outer rings
+    ctx.lineWidth = 12;
+    ctx.strokeStyle = "#2a2a2a";
+    ctx.beginPath(); ctx.arc(0, 0, RADIUS + 6, 0, TWO_PI); ctx.stroke();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#151515";
+    ctx.beginPath(); ctx.arc(0, 0, RADIUS + 13, 0, TWO_PI); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.25)";
+    ctx.beginPath(); ctx.arc(0, 0, RADIUS - 1, 0, TWO_PI); ctx.stroke();
+
+    // Center hub with a creeper face
+    ctx.fillStyle = "#2f2f2f";
+    ctx.beginPath(); ctx.arc(0, 0, 48, 0, TWO_PI); ctx.fill();
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "#151515";
+    ctx.beginPath(); ctx.arc(0, 0, 48, 0, TWO_PI); ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(255,255,255,.2)";
+    ctx.beginPath(); ctx.arc(0, 0, 42, 0, TWO_PI); ctx.stroke();
+    drawPix(ctx, PIX.creeper, -16, -16, 32);
+
+    ctx.restore();
+  }
+
+  /* ============================================================
+     Sounds (generated with the Web Audio API, no files needed)
+     ============================================================ */
+  var audioCtx = null;
+  function ac() {
+    if (!soundToggle.checked) return null;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      return audioCtx;
+    } catch (e) { return null; }
+  }
+  function tick() {
+    var a = ac(); if (!a) return;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = "square"; o.frequency.value = 950;
+    g.gain.setValueAtTime(0.06, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.045);
+    o.connect(g); g.connect(a.destination);
+    o.start(); o.stop(a.currentTime + 0.05);
+  }
+  function winJingle() {
+    var a = ac(); if (!a) return;
+    var notes = [659.25, 783.99, 987.77, 1318.51];
+    notes.forEach(function (f, i) {
+      var t = a.currentTime + i * 0.13;
+      var o = a.createOscillator(), g = a.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.12, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      o.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + 0.5);
+    });
+  }
+
+  /* ============================================================
+     Toast messages
+     ============================================================ */
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 3200);
+  }
+
+  /* ============================================================
+     Spin!
+     ============================================================ */
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function pointerIndex(count) {
+    var wa = TWO_PI / count;
+    var local = (((-Math.PI / 2 - rotation) % TWO_PI) + TWO_PI) % TWO_PI;
+    return Math.floor(local / wa) % count;
+  }
+
+  function spin() {
+    if (spinning) return;
+    var pool = wheelEntries();
+    if (pool.length === 0) {
+      showToast("Add player names to the roster first!");
+      return;
+    }
+    if (pool.length < pickCount) {
+      showToast("Only " + pool.length + " on the wheel. Pick fewer players or restore some!");
+      return;
+    }
+    if (pool.length === 1) {
+      showToast("Only one player left, that was easy!");
+      finishSpin([pool[0]]);
+      return;
+    }
+
+    spinning = true;
+    spinBtn.disabled = true;
+    namesBox.disabled = true;
+    removeToggle.disabled = true;
+
+    var winners = shuffle(pool).slice(0, pickCount);
+    var landIdx = pool.indexOf(winners[0]);
+    var wa = TWO_PI / pool.length;
+    var jitter = (Math.random() - 0.5) * wa * 0.7;
+    var target = -Math.PI / 2 - (landIdx + 0.5) * wa + jitter;
+    var minTurns = reducedMotion ? 1 : 6 + Math.floor(Math.random() * 3);
+    while (target < rotation + minTurns * TWO_PI) target += TWO_PI;
+
+    var start = rotation;
+    var change = target - start;
+    var duration = reducedMotion ? 900 : 4300;
+    var t0 = null;
+    var lastIdx = pointerIndex(pool.length);
+
+    function frame(ts) {
+      if (t0 === null) t0 = ts;
+      var t = Math.min((ts - t0) / duration, 1);
+      var eased = 1 - Math.pow(1 - t, 4);
+      rotation = start + change * eased;
+      drawWheel(-1);
+
+      var idx = pointerIndex(pool.length);
+      if (idx !== lastIdx) { tick(); lastIdx = idx; }
+
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        rotation = rotation % TWO_PI;
+        drawWheel(landIdx);
+        setTimeout(function () { finishSpin(winners); }, 550);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function finishSpin(winners) {
+    winJingle();
+    confettiBurst();
+
+    cardsBox.innerHTML = "";
+    var iconKeys = ["creeper", "diamond", "sword", "heart", "xp", "potion"];
+    winners.forEach(function (w, i) {
+      var card = document.createElement("div");
+      card.className = "card";
+      card.style.animationDelay = (reducedMotion ? 0 : i * 0.22) + "s";
+      var ic = document.createElement("canvas");
+      ic.width = 8 * 5; ic.height = 8 * 5;
+      drawPix(ic.getContext("2d"), PIX[iconKeys[i % iconKeys.length]], 0, 0, 40);
+      var span = document.createElement("span");
+      span.className = "pname";
+      span.textContent = w.name;
+      card.appendChild(ic);
+      card.appendChild(span);
+      cardsBox.appendChild(card);
+    });
+
+    document.getElementById("resultsTitle").textContent =
+      winners.length === 1 ? "PLAYER SELECTED!" : "PLAYERS SELECTED!";
+    announcer.textContent = "Selected: " + winners.map(function (w) { return w.name; }).join(", ");
+
+    if (removeToggle.checked) {
+      winners.forEach(function (w) { picked[w.id] = true; });
+    }
+
+    overlay.classList.add("show");
+    spinning = false;
+    spinBtn.disabled = false;
+    namesBox.disabled = false;
+    removeToggle.disabled = false;
+    closeBtn.focus();
+  }
+
+  function closeOverlay() {
+    overlay.classList.remove("show");
+    refresh();
+  }
+
+  /* ============================================================
+     Confetti in Minecraft block colors
+     ============================================================ */
+  var confColors = ["#6cbf43", "#4aedd9", "#e0483a", "#fcdc5f", "#3b5dc9", "#9a5cc6", "#b8865f"];
+  function confettiBurst() {
+    if (reducedMotion) return;
+    for (var i = 0; i < 70; i++) {
+      var c = document.createElement("div");
+      c.className = "confetti";
+      var size = 7 + Math.random() * 8;
+      c.style.width = size + "px";
+      c.style.height = size + "px";
+      c.style.left = Math.random() * 100 + "vw";
+      c.style.background = confColors[Math.floor(Math.random() * confColors.length)];
+      c.style.animationDuration = (1.7 + Math.random() * 1.6) + "s";
+      c.style.animationDelay = (Math.random() * 0.4) + "s";
+      c.addEventListener("animationend", function () { this.remove(); });
+      document.body.appendChild(c);
+    }
+  }
+
+  /* ============================================================
+     Background particles and title icons
+     ============================================================ */
+  function decorate() {
+    var colors = ["#6cbf43", "#4aedd9", "#fcdc5f", "#9a5cc6"];
+    for (var i = 0; i < 9; i++) {
+      var p = document.createElement("div");
+      p.className = "particle";
+      p.style.left = (4 + Math.random() * 92) + "vw";
+      p.style.background = colors[i % colors.length];
+      p.style.animationDuration = (14 + Math.random() * 16) + "s";
+      p.style.animationDelay = (-Math.random() * 20) + "s";
+      document.body.appendChild(p);
+    }
+    var t1 = document.getElementById("titleIcon");
+    var t2 = document.getElementById("titleIcon2");
+    drawPix(t1.getContext("2d"), PIX.creeper, 0, 0, 8);
+    drawPix(t2.getContext("2d"), PIX.diamond, 0, 0, 8);
+  }
+
+  /* ============================================================
+     Wire up controls
+     ============================================================ */
+  function refresh() {
+    parseRoster();
+    updateSidebar();
+    drawWheel(-1);
+    saveState();
+  }
+
+  function selectCount(n) {
+    pickCount = n;
+    slots.forEach(function (s) {
+      var on = parseInt(s.dataset.n, 10) === n;
+      s.classList.toggle("selected", on);
+      s.setAttribute("aria-checked", on ? "true" : "false");
+    });
+    hotbarLabel.textContent = "PLAYERS TO PICK: " + n;
+    saveState();
+  }
+
+  slots.forEach(function (s) {
+    s.addEventListener("click", function () { selectCount(parseInt(s.dataset.n, 10)); });
+  });
+
+  namesBox.addEventListener("input", refresh);
+  removeToggle.addEventListener("change", refresh);
+  soundToggle.addEventListener("change", function () { updateSidebar(); saveState(); });
+  restoreBtn.addEventListener("click", function () { picked = {}; refresh(); });
+  spinBtn.addEventListener("click", spin);
+  closeBtn.addEventListener("click", closeOverlay);
+  againBtn.addEventListener("click", function () { closeOverlay(); spin(); });
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) closeOverlay(); });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "Space" && document.activeElement !== namesBox &&
+        document.activeElement.tagName !== "BUTTON") {
+      e.preventDefault();
+      if (overlay.classList.contains("show")) closeOverlay();
+      else spin();
+    }
+    if (e.code === "Escape" && overlay.classList.contains("show")) closeOverlay();
+  });
+
+  /* ============================================================
+     Boot
+     ============================================================ */
+  var hadSaved = loadState();
+  if (!hadSaved && !namesBox.value.trim()) {
+    namesBox.value = ["Steve", "Alex", "Enderman", "Creeper", "Skeleton", "Zombie", "Villager", "Witch"].join("\n");
+  }
+  selectCount(pickCount);
+  decorate();
+  refresh();
+
+  // Redraw once the pixel fonts finish loading so text metrics are right
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { drawWheel(-1); });
+  }
+})();
+</script>
+</body>
+</html>
